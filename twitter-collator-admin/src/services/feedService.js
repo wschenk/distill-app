@@ -27,8 +27,13 @@ export class FeedService {
     }
 
     async refreshFeed() {
-        // Clear cache before refreshing
+        // Clear both API cache and profile cache before refreshing
         this.api.clearCache();
+        
+        // Import profileCache dynamically to avoid circular dependencies
+        const { profileCache } = await import('../utils/profileCache.js');
+        profileCache.clear();
+        
         return this.getCombinedFeed();
     }
 }

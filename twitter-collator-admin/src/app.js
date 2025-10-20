@@ -7,10 +7,15 @@ import { api } from './api/index.js';
 import { UserService } from './services/userService.js';
 import { CollectionService } from './services/collectionService.js';
 import { FeedService } from './services/feedService.js';
+import { RetweetService } from './services/retweetService.js';
+import { StatsService } from './services/statsService.js';
 import { UserManager } from './ui/userManager.js';
 import { CollectionManager } from './ui/collectionManager.js';
 import { FeedManager } from './ui/feedManager.js';
+import { RetweetManager } from './ui/retweetManager.js';
+import { StatsManager } from './ui/statsManager.js';
 import { showMessage, showLoading, hideLoading } from './utils/helpers.js';
+import { devTools } from './utils/devTools.js';
 
 export class TwitterCollatorApp {
     constructor() {
@@ -22,11 +27,15 @@ export class TwitterCollatorApp {
         this.userService = new UserService(api.users);
         this.collectionService = new CollectionService(api.collections);
         this.feedService = new FeedService(api);
-        
+        this.retweetService = new RetweetService(api.retweets);
+        this.statsService = new StatsService(api.stats);
+
         // Initialize UI managers
         this.userManager = new UserManager(this.userService);
         this.collectionManager = new CollectionManager(this.collectionService);
         this.feedManager = new FeedManager(this.feedService);
+        this.retweetManager = new RetweetManager(this.retweetService);
+        this.statsManager = new StatsManager(this.statsService);
     }
 
     async init() {
@@ -57,6 +66,8 @@ export class TwitterCollatorApp {
         window.userManager = this.userManager;
         window.collectionManager = this.collectionManager;
         window.feedManager = this.feedManager;
+        window.retweetManager = this.retweetManager;
+        window.statsManager = this.statsManager;
             
             this.isInitialized = true;
             console.log('Twitter Collator Admin initialized successfully');
@@ -80,28 +91,35 @@ export class TwitterCollatorApp {
 
     async loadInitialData() {
         const loadingPromises = [];
-        
+
         // Load watched users
         loadingPromises.push(
             this.userManager.loadWatchedUsers().catch(error => {
                 console.error('Failed to load watched users:', error);
             })
         );
-        
+
         // Load collections
         loadingPromises.push(
             this.collectionManager.loadCollections().catch(error => {
                 console.error('Failed to load collections:', error);
             })
         );
-        
+
         // Load feed
         loadingPromises.push(
             this.feedManager.loadFeed().catch(error => {
                 console.error('Failed to load feed:', error);
             })
         );
-        
+
+        // Load stats
+        loadingPromises.push(
+            this.statsManager.loadStats().catch(error => {
+                console.error('Failed to load stats:', error);
+            })
+        );
+
         // Wait for all initial data to load
         await Promise.allSettled(loadingPromises);
     }
@@ -256,9 +274,14 @@ export class TwitterCollatorApp {
         }
     }
 
-    clearCache() {
+    async clearCache() {
         api.clearCache();
-        showMessage('Cache cleared successfully', 'success');
+        
+        // Also clear profile cache
+        const { profileCache } = await import('./utils/profileCache.js');
+        profileCache.clear();
+        
+        showMessage('All caches cleared successfully', 'success');
     }
 
     // Utility methods
@@ -318,3 +341,6 @@ window.debugTwitterApp = {
     refreshData: () => window.twitterApp?.refreshData(),
     checkAPIHealth: () => window.twitterApp?.api.healthCheck()
 };
+
+// Make devTools available globally (already done in devTools.js, but ensure it's set)
+window.devTools = devTools;

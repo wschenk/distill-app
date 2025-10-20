@@ -91,21 +91,12 @@ export class TwitterCollatorAPI {
         // Process watched users
         console.log('👤 Processing users...', watchedUsersData.success, watchedUsersData.users?.length);
         if (watchedUsersData.success && watchedUsersData.users) {
-            // Limit to first 10 users for performance
-            const usersToProcess = watchedUsersData.users.slice(0, 10);
+            // Process all users so filtered selections (e.g., sama) always appear
+            const usersToProcess = watchedUsersData.users;
             for (const user of usersToProcess) {
                 try {
                     let summaryData = null;
-                    let profile = null;
-                    
-                    // Try to get profile data first
-                    try {
-                        profile = await this.users.getUserProfile(user.username);
-                    } catch (profileError) {
-                        console.warn(`No profile for ${user.username}:`, profileError.message);
-                    }
-                    
-                    // Try to get summary data
+                    // Always use userSummary (never userProfile)
                     try {
                         if (user.latestSummary && user.latestSummary.url) {
                             summaryData = await this.http.get(user.latestSummary.url);
@@ -114,17 +105,17 @@ export class TwitterCollatorAPI {
                         }
                     } catch (summaryError) {
                         console.warn(`No summary for ${user.username}, creating basic summary`);
-                        // Create a basic summary with profile data
+                        // Create a basic summary with minimal fields
                         summaryData = {
-                            topLevelSummary: profile ? `${profile.name || user.username} - ${profile.description || 'Twitter user'}` : `User: ${user.username}`,
+                            topLevelSummary: `User: ${user.username}`,
                             conversations: [],
-                            profile: profile
+                            profile: undefined
                         };
                     }
                     
-                    // Add profile data to summary if we have it
-                    if (profile && !summaryData.profile) {
-                        summaryData.profile = profile;
+                    // Normalize: backend summary may use `userProfile` key
+                    if (summaryData && !summaryData.profile && summaryData.userProfile) {
+                        summaryData.profile = summaryData.userProfile;
                     }
                     
                     console.log('🔧 About to push user, feedItems is array:', Array.isArray(feedItems));

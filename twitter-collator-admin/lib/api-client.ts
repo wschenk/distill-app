@@ -184,16 +184,17 @@ class ApiClient {
       }
 
       if (!response.ok) {
-        // Handle 404s gracefully for profile requests
+        // Convert non-OK responses into structured failures instead of throwing
         if (response.status === 404 && endpoint.includes('/profile')) {
           console.warn(`[ApiClient] Profile not found for: ${endpoint}`);
-          return {
-            success: false,
-            error: 'Profile not found',
-            data: null
-          };
+          return { success: false, error: 'Profile not found', data: null } as unknown as ApiResponse<T>;
         }
-        throw new Error(`HTTP error! status: ${response.status}`);
+        let errorText = response.statusText;
+        try {
+          const errJson = await response.json();
+          errorText = errJson?.error || errJson?.message || errorText;
+        } catch {}
+        return { success: false, error: `HTTP ${response.status}: ${errorText}` } as unknown as ApiResponse<T>;
       }
 
       const data = await response.json();
@@ -207,8 +208,9 @@ class ApiClient {
         });
       }
       
-      // API routes return { success, data } structure
-      return data;
+      // API routes return { success, data } structure; normalize if needed
+      if (typeof data?.success === 'boolean') return data;
+      return { success: true, data } as ApiResponse<T>;
     } catch (error) {
       console.error('[ApiClient] Request failed:', { url: endpoint, error });
       return {

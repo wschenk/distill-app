@@ -11,10 +11,13 @@ export class CollectionService {
     async getCollections() {
         try {
             const result = await this.collectionApi.getCollections();
+            // New API returns {collections: [], count, lastUpdated}
+            // Normalize to {success: true, collections: []}
             return {
-                success: result.success,
+                success: true,
                 collections: result.collections || [],
-                message: result.message
+                count: result.count,
+                lastUpdated: result.lastUpdated
             };
         } catch (error) {
             return {

@@ -30,24 +30,25 @@ export function useWatchedUsers() {
         const usersWithProfiles = await Promise.all(
           usersList.map(async (user) => {
             try {
-              const profileResponse = await apiClient.getUserProfile(user.username);
-              if (profileResponse.success && profileResponse.data) {
-                return {
-                  ...user,
-                  profile: {
-                    name: profileResponse.data.name,
-                    avatar_url: profileResponse.data.profile_image_url,
-                    description: profileResponse.data.description,
-                    verified: profileResponse.data.verified,
-                    followers_count: profileResponse.data.public_metrics?.followers_count,
-                  }
-                };
-              } else if (profileResponse.error === 'Profile not found') {
-                // Silently handle missing profiles - these are likely test users
-                console.debug(`Profile not available for ${user.username} (likely test user)`);
+              // Always use userSummary, never userProfile
+              const summaryResponse = await apiClient.getUserSummary(user.username);
+              if (summaryResponse.success && summaryResponse.data) {
+                const profile = summaryResponse.data.profile;
+                if (profile) {
+                  return {
+                    ...user,
+                    profile: {
+                      name: profile.name,
+                      avatar_url: profile.profile_image_url,
+                      description: profile.description,
+                      verified: profile.verified,
+                      followers_count: profile.public_metrics?.followers_count,
+                    }
+                  };
+                }
               }
-            } catch (profileError) {
-              console.warn(`Failed to fetch profile for ${user.username}:`, profileError);
+            } catch (summaryError) {
+              console.warn(`Failed to fetch summary for ${user.username}:`, summaryError);
             }
             return user;
           })
@@ -160,14 +161,16 @@ export function useCollectionAvatars() {
 
   const fetchCollectionAvatar = useCallback(async (collectionName: string, firstMember: string) => {
     try {
-      const profileResponse = await apiClient.getUserProfile(firstMember);
-      if (profileResponse.success && profileResponse.data?.profile_image_url) {
+      // Always use userSummary, never userProfile
+      const summaryResponse = await apiClient.getUserSummary(firstMember);
+      const img = summaryResponse.success ? summaryResponse.data?.profile?.profile_image_url : undefined;
+      if (img) {
         setCollectionAvatars(prev => ({
           ...prev,
-          [collectionName]: profileResponse.data.profile_image_url
+          [collectionName]: img
         }));
-      } else if (profileResponse.error === 'Profile not found') {
-        console.debug(`Profile not available for collection ${collectionName} member ${firstMember}`);
+      } else if (summaryResponse && !summaryResponse.success) {
+        console.debug(`Summary not available for collection ${collectionName} member ${firstMember}`);
       }
     } catch (error) {
       console.warn(`Failed to fetch avatar for collection ${collectionName}:`, error);
